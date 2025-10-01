@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <cmath>
+#include <algorithm>
 
 using namespace std;
 
@@ -13,6 +15,11 @@ struct PlaData {
 	int productNum = 0;	//used in for loop to check how many product lines have to read
 	vector<string> varNames;	//store the different variable names
 	map<string, int> productLine;	//the result and the product line command
+};
+
+struct Term {
+	string pattern;
+	int minterm;
 };
 
 PlaData readPlaFile(string fileName) {
@@ -64,7 +71,8 @@ PlaData readPlaFile(string fileName) {
 
 		ss3 >> product;
 		ss3 >> temp;
-		result = stoi(temp);
+		if(temp == "-") result = -1;
+		else result = stoi(temp);
 		data.productLine[product] = result;
 	}
 
@@ -107,6 +115,47 @@ map<string, int> buildTruthTable(int inputNum, PlaData& data) {
 	return truthTable;
 }
 
+vector<string> splitProduct(string product) {
+	vector<string> result;
+	bool hasHivent = false;
+	for (int i = 0; i < product.length(); i++) {
+		if (product[i] == '-') {
+			hasHivent = true;
+			string temp1 = product;
+			string temp2 = product;
+			temp1[i] = '0';
+			temp2[i] = '1';
+			//do the recusion if the product has more than one '-'
+			vector<string> result1 = splitProduct(temp1);
+			for (auto it : result1) {
+				result.push_back(it);
+			}
+			vector<string> result2 = splitProduct(temp2);
+			for (auto it : result2) {
+				result.push_back(it);
+			}
+			return result;
+		}
+
+	}
+	if(!hasHivent) result.push_back(product);
+	return result;
+}
+
+void changeTruthTable(map<string, int>& truthTable, PlaData data) {
+	for (auto element : data.productLine) {
+		if (element.first.find('-') != string::npos) {
+			vector<string> extraProduct = splitProduct(element.first);
+			for (auto it : extraProduct) {
+				truthTable[it] = element.second;
+			}
+		}
+		else {
+			truthTable[element.first] = element.second;
+		}
+	}
+}
+
 //do the groups distribute
 int countOnes(const string& term){
 	int count = 0;
@@ -116,48 +165,61 @@ int countOnes(const string& term){
 	return count;	
 }
 
-map<int, vector<string>> groupByOne(const map<string, int> &truthTable){
-	map<int, vector<string>> groups;
+map<int, vector<Term>> groupByOne(const map<string, int> &truthTable){
+	map<int, vector<Term>> groups;
+	int index = 0;
 	for(auto term : truthTable){
 		if(term.second == 1){
 			int ones = countOnes(term.first);
-			groups[ones].push_back(term.first);
+			groups[ones].push_back({term.first, index});
 		}
+		index++;
 	}
 	return groups;
 }
 
-bool canCombine(const string& term1, const string& term2){
-	if(term1.length() != term2.length()) return false;
-	int same = 0;
+int canCombine(const string& term1, const string& term2){
+	if(term1.length() != term2.length()) return -1;
+	int diff = 0;
+	int pos = -1;
 	for(int i = 0; i < term1.length(); i++){
-		if(term1[i] == term2[i]){
-			same++;
+		if(term1[i] != term2[i]){
+			diff++;
+			pos = i;
 		}
 		else if(term1[i] == '-' || term2[i] == '-'){
-			return false;
+			return -1;
 		}
+		
+		if(diff > 1){return -1;}
 	}
-
-	if(same == term1.length() - 1){
-		return true;
-	}
-	else{
-		return false;
-	}
+	return pos;
 }
 
 string combine(const string&term1, const string& term2){
 	string newTerm;
-	for(int i = 0; i < term1.length(); i++){
-		if(term1[i] != term2[i]){
-			newTerm  = newTerm + '-';
-		}
-		else{
-			newTerm = newTerm + term1[i];
+	newTerm = term1;
+	if(canCombine(term1, term2)) newTerm[canCombine(term1, term2)] = '-';
+	else newTerm = "";
+	return newTerm;
+}
+
+map<string, vector<int>> combineGroups(map<int, vector<Term>>& groups){
+	map<string, vector<int>> newGroups;
+	for(int i = 0 ; i < groups.size() - 1; i++){
+		for(auto subGroup : groups[i]){
+			for(auto nextSubGroup : groups[i + 1]){
+				if(canCombine(subGroup.pattern, nextSubGroup.pattern) != -1){
+					string newPattern = combine(subGroup.pattern, nextSubGroup.pattern);
+					if(newPattern != ""){
+						newGroups[newPattern].push_back(subGroup.minterm);
+						newGroups[newPattern].push_back(nextSubGroup.minterm);
+					}
+				}
+			}
 		}
 	}
-	return newTerm;
+	return newGroups;
 }
 
 //do the method
