@@ -651,11 +651,6 @@ int main(int argc, char* argv[]){
 	cout << "Total number of literals: " << totalLiterals << endl;
     
 	outputPlaFile(outputFileName, data, selectedPIs, primeImplicants);
-    // 最後輸出時用 outputFileName
-    ofstream outputFile(outputFileName);
-
-    
-    cout << "\nOutput written to " << outputFileName << endl;
     cout << "Total number of terms: " << totalTerms << endl;
     cout << "Total number of literals: " << totalLiterals << endl;
     
