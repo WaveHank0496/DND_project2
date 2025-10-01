@@ -574,6 +574,7 @@ int main(int argc, char* argv[]){
 	}
 
 	// 簡單選擇：貪心法（選覆蓋最多 uncovered minterm 的 PI）
+	/*
 	vector<int> selectedPIs = essentialPIs;  // 從 EPI 開始
 	vector<int> stillUncovered = uncoveredMinterms;
 
@@ -632,6 +633,7 @@ int main(int argc, char* argv[]){
 		}
 		stillUncovered = newUncovered;
 	}
+	*/
 
 	// 輸出最終結果
 	cout << "\n=== Final Solution ===" << endl;
@@ -657,13 +659,3 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
-/*
-int main(int argc, char* argv[]){
-    string t1 = "0101";
-    string t2 = "0111";
-
-    cout << countOnes(t1) << endl;  // 應該輸出：2
-    cout << canCombine(t1, t2) << endl;  // 應該輸出：1 (true)
-    cout << combine(t1, t2) << endl;  // 應該輸出：01-1
-}
-*/
