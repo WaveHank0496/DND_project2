@@ -187,6 +187,9 @@ int canCombine(const string& term1, const string& term2){
 			diff++;
 			pos = i;
 		}
+		else if (term1[i] == '-' && term2[i] == '-'){
+			continue;
+		}
 		else if(term1[i] == '-' || term2[i] == '-'){
 			return -1;
 		}
@@ -199,7 +202,8 @@ int canCombine(const string& term1, const string& term2){
 string combine(const string&term1, const string& term2){
 	string newTerm;
 	newTerm = term1;
-	if(canCombine(term1, term2)) newTerm[canCombine(term1, term2)] = '-';
+	int pos = canCombine(term1, term2);
+	if(pos != -1) newTerm[pos] = '-';
 	else newTerm = "";
 	return newTerm;
 }
