@@ -172,7 +172,7 @@ map<int, vector<Term>> groupByOne(const map<string, int> &truthTable){
 	map<int, vector<Term>> groups;
 	int index = 0;
 	for(auto term : truthTable){
-		if(term.second == 1){
+		if(term.second == 1 || term.second == -1){
 			int ones = countOnes(term.first);
 			Term newTerm;
 			newTerm.pattern = term.first;
@@ -284,10 +284,17 @@ set<int> findEPI(map<int, vector<bool>> chart, const set<int>& mintermVar ){
 	int setSize = mintermVar.size();
 	for(int i = 0; i < setSize; i++){
 		int count = 0;
+		int row = 0;
 		for(int j = 0; j < chart.size(); j++){
-			if(chart[j][i] == true){count++;}
-			if(count > 1) break;
-			else{EPI.insert(i);}
+			if(chart[j][i] == true){
+				count++;
+				row  = j;
+			}
+			if(count > 1) {
+				row = 0;
+				break;
+			}
+			else{EPI.insert(row);}
 		}
 	}
 	return EPI;
@@ -478,22 +485,365 @@ void testDuplicateRemoval() {
     }
 }
 
+void printOutPI(vector<Term> primeImplicants){
+	 cout << "\n=== Prime Implicants ===" << endl;
+    for(int i = 0; i < primeImplicants.size(); i++){
+        cout << "PI" << i << ": " << primeImplicants[i].pattern << " covers {";
+        for(int m : primeImplicants[i].minterm) cout << m << " ";
+        cout << "}" << endl;
+    }
+}
+vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Term> primeImplicants){
+	// ========== Step 1: collect on-set minterms ==========
+	cout << "\n=== Prime Implicant Chart ===" << endl;
+
+	vector<int> onSetMinterms;
+	for(int i = 0; i < truthTable.size(); i++){
+		string binary = intoBinary(i, data.inputNum);
+		if(truthTable[binary] == 1){  // find the minterm with output 1
+			onSetMinterms.push_back(i);
+		}
+	}
+
+	cout << "On-set minterms (output=1): {";
+	for(int m : onSetMinterms) cout << m << " ";
+	cout << "}\n" << endl;
+
+	// ========== Step 2: build the reverse index ==========
+	// mintermToPIs[m] = where m is covered by which PIs
+	map<int, vector<int>> mintermToPIs;
+
+	for(int i = 0; i < primeImplicants.size(); i++){
+		for(int m : primeImplicants[i].minterm){
+			// only check the minterm in on-set
+			if(truthTable[intoBinary(m, data.inputNum)] == 1){
+				mintermToPIs[m].push_back(i);
+			}
+		}
+	}
+
+	// ========== Step 3: print the table ==========
+	cout << "Prime Implicant Chart:" << endl;
+	cout << "       ";
+	for(int m : onSetMinterms){
+		if(m < 10) cout << " m" << m << " ";
+		else cout << " m" << m;
+	}
+	cout << endl;
+
+	for(int i = 0; i < primeImplicants.size(); i++){
+		cout << "PI" << i << "   ";
+		for(int m : onSetMinterms){
+			bool covered = false;
+			// check whether pi i cover m
+			for(int pi : mintermToPIs[m]){
+				if(pi == i){
+					covered = true;
+					break;
+				}
+			}
+			cout << (covered ? "  X " : "    ");
+		}
+		cout << "  " << primeImplicants[i].pattern << endl;
+	}
+
+	//find EPI
+	// ========== Step 4: find EPI ==========
+	cout << "\n=== Finding Essential Prime Implicants ===" << endl;
+
+	vector<int> essentialPIs;
+	set<int> coveredByEPIs;  
+
+	for(int m : onSetMinterms){
+		if(mintermToPIs[m].size() == 1){
+			// if the minterm is covered by only one PI -> Essential!
+			int epi = mintermToPIs[m][0];
+			
+			// check if already added
+			if(find(essentialPIs.begin(), essentialPIs.end(), epi) == essentialPIs.end()){
+				essentialPIs.push_back(epi);
+				cout << "m" << m << " only covered by PI" << epi 
+					<< " (" << primeImplicants[epi].pattern << ") -> Essential!" << endl;
+				
+				// check this EPI cover which minterm
+				for(int covered : primeImplicants[epi].minterm){
+					if(truthTable[intoBinary(covered, data.inputNum)] == 1){
+						coveredByEPIs.insert(covered);
+					}
+				}
+			}
+		}
+	}
+
+	cout << "\nEssential PIs: {";
+	for(int epi : essentialPIs) cout << "PI" << epi << " ";
+	cout << "}" << endl;
+
+	cout << "Covered by EPIs: {";
+	for(int m : coveredByEPIs) cout << m << " ";
+	cout << "}" << endl;
+
+	//find the uncovered 
+	// ========== Step 5: find uncovered minterms ==========
+	vector<int> uncoveredMinterms;
+	for(int m : onSetMinterms){
+		if(coveredByEPIs.find(m) == coveredByEPIs.end()){
+			uncoveredMinterms.push_back(m);
+		}
+	}
+
+	cout << "\nStill need to cover: {";
+	for(int m : uncoveredMinterms) cout << m << " ";
+	cout << "}" << endl;
+
+	if(uncoveredMinterms.empty()){
+		cout << "\nAll minterms covered by Essential PIs!" << endl;
+		cout << "No need for Petrick's Method." << endl;
+
+		vector<int> selectedPIs = essentialPIs;
+		
+	}
+
+	// ========== Step 6: Petrick's Method  ==========
+	cout << "\n=== Petrick's Method (Enumeration) ===" << endl;
+
+	if (uncoveredMinterms.empty())
+	{
+		// all be covered by EPI
+		vector<int> selectedPIs = essentialPIs;
+
+		cout << "\n=== Final Solution ===" << endl;
+		cout << "Selected PIs: {";
+		for (int pi : selectedPIs)
+			cout << "PI" << pi << " ";
+		cout << "}" << endl;
+	}
+	else
+	{
+		// Petrick's Metho
+		// find the candidate PIs that can cover the uncovered minterms
+		cout << "Uncovered minterms and their covering PIs:" << endl;
+		for (int m : uncoveredMinterms)
+		{
+			cout << "  m" << m << " can be covered by: {";
+			for (int pi : mintermToPIs[m])
+			{
+				cout << "PI" << pi << " ";
+			}
+			cout << "}" << endl;
+		}
+
+		vector<int> candidatePIs;
+		for (int i = 0; i < primeImplicants.size(); i++)
+		{
+			// skip EPIs
+			if (find(essentialPIs.begin(), essentialPIs.end(), i) != essentialPIs.end())
+			{
+				continue;
+			}
+
+			// check whether pi i cover any uncovered minterm
+			bool useful = false;
+			for (int m : uncoveredMinterms)
+			{
+				// check whether pi i is in mintermToPIs[m]
+				if (find(mintermToPIs[m].begin(), mintermToPIs[m].end(), i) != mintermToPIs[m].end())
+				{
+					useful = true;
+					break;
+				}
+			}
+
+			if (useful)
+			{
+				candidatePIs.push_back(i);
+			}
+		}
+
+		cout << "\nCandidate PIs (non-Essential): {";
+		for (int pi : candidatePIs)
+			cout << "PI" << pi << " ";
+		cout << "}" << endl;
+
+		// 2. Enumerate all combinations (using bitmask)
+		cout << "\nEnumerating all possible combinations..." << endl;
+
+		vector<vector<int>> validSolutions;
+		int minSize = candidatePIs.size() + 1; 
+
+		// use bitmask to enumerate all combinations (from 1 to 2^n - 1)
+		for (int mask = 1; mask < (1 << candidatePIs.size()); mask++)
+		{
+			vector<int> combination;
+
+			// build the combination from the bitmask
+			for (int i = 0; i < candidatePIs.size(); i++)
+			{
+				if (mask & (1 << i))
+				{
+					combination.push_back(candidatePIs[i]);
+				}
+			}
+
+			// check that this combination covers all uncovered minterms
+			bool coversAll = true;
+			for (int m : uncoveredMinterms)
+			{
+				bool covered = false;
+				for (int pi : combination)
+				{
+					// check whether pi is in mintermToPIs[m]
+					if (primeImplicants[pi].minterm.find(m) != primeImplicants[pi].minterm.end())
+					{
+						covered = true;
+						break;
+					}
+				}
+				if (!covered)
+				{
+					coversAll = false;
+					break;
+				}
+			}
+
+			if (coversAll)
+			{
+				if (combination.size() < minSize)
+				{
+					// if found smaller solution, clear previous ones
+					validSolutions.clear();
+					validSolutions.push_back(combination);
+					minSize = combination.size();
+				}
+				else if (combination.size() == minSize)
+				{
+					validSolutions.push_back(combination);
+				}
+			}
+		}
+
+		cout << "Found " << validSolutions.size() << " solution(s) with "
+			 << minSize << " PI(s)" << endl;
+
+		// 3. choose the best solution (minimize literals)
+		int bestSolution = 0;
+		int minLiterals = 999999;
+
+		for (int i = 0; i < validSolutions.size(); i++)
+		{
+			int literals = 0;
+			cout << "\nSolution " << i + 1 << ": {";
+			for (int pi : validSolutions[i])
+			{
+				cout << "PI" << pi << " ";
+				// cout the literals count
+				for (char c : primeImplicants[pi].pattern)
+				{
+					if (c != '-')
+						literals++;
+				}
+			}
+			cout << "} - " << literals << " literals" << endl;
+
+			if (literals < minLiterals)
+			{
+				minLiterals = literals;
+				bestSolution = i;
+			}
+		}
+
+		cout << "\nBest solution is #" << (bestSolution + 1) << endl;
+
+		// 4. combine the best solution with EPIs
+		vector<int> selectedPIs = essentialPIs;
+		for (int pi : validSolutions[bestSolution])
+		{
+			selectedPIs.push_back(pi);
+		}
+
+		sort(selectedPIs.begin(), selectedPIs.end());
+
+		cout << "\n=== Final Solution ===" << endl;
+		cout << "Selected PIs: {";
+		for (int pi : selectedPIs)
+		{
+			cout << "PI" << pi << "(" << primeImplicants[pi].pattern << ") ";
+		}
+		cout << "}" << endl;
+
+		// cout total
+		int totalTerms = selectedPIs.size();
+		int totalLiterals = 0;
+		for (int pi : selectedPIs)
+		{
+			for (char c : primeImplicants[pi].pattern)
+			{
+				if (c != '-')
+					totalLiterals++;
+			}
+		}
+
+		cout << "Total number of terms: " << totalTerms << endl;
+		cout << "Total number of literals: " << totalLiterals << endl;
+
+		return selectedPIs;
+	}
+	return {};
+}
+
+void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicants, vector<int> selectedPIs){
+	// ========== print out the output file ==========
+	cout << "\nWriting output to " << outputFileName << "..." << endl;
+
+	ofstream outFile(outputFileName);
+	if (!outFile.is_open())
+	{
+		cout << "Error: Cannot create output file!" << endl;
+	}
+
+	// write the PLA format
+	outFile << ".i " << data.inputNum << endl;
+	outFile << ".o 1" << endl;
+	outFile << ".ilb";
+	for (const string &var : data.varNames)
+	{
+		outFile << " " << var;
+	}
+	outFile << endl;
+	outFile << ".ob f" << endl;
+	outFile << ".p " << selectedPIs.size() << endl;
+
+	// write the selected prime implicants
+	for (int pi : selectedPIs)
+	{
+		outFile << primeImplicants[pi].pattern << " 1" << endl;
+	}
+
+	outFile << ".e" << endl;
+	outFile.close();
+
+	cout << "Output file created successfully!" << endl;
+}
 
 int main(int argc, char* argv[]){
+	
 	if(argc == 1) {
         cout << "Running tests..." << endl;
         testCombineGroups();
         testDuplicateRemoval();
         testWithRealData();
+
         return 0;
     }
 
+	
     // check the input command
-    if(argc != 3){
+	if(argc != 3){
         cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
         return 1;
     }
-    
+	
+
     string inputFileName = argv[1];
     string outputFileName = argv[2];
 
@@ -510,8 +860,29 @@ int main(int argc, char* argv[]){
     
     // do the groups by the one count
     map<int, vector<Term>> groups = groupByOne(truthTable);
-	map<int, vector<Term>> newGroups = combineGroups(groups);
+	int round = 1;
+	while(true){
+    	map<int, vector<Term>> newGroups = combineGroups(groups);
+    	if(newGroups.empty()) break;
+    	groups = newGroups;
+		round++;
+		if(round > 10) break;	//make sure i will stop
+	}
 
+	//collect the prime implicants
+	vector<Term> makePrimeImplicant;
+	for(auto& g : groups){
+		for(auto& term : g.second){
+			makePrimeImplicant.push_back(term);
+		}
+	}
+	printOutPI(makePrimeImplicant);
+
+	buildPIChart(truthTable, data, makePrimeImplicant);
+
+	vector<int> selectedPis = buildPIChart(truthTable, data, makePrimeImplicant);
+
+	writePLA(outputFileName, data, makePrimeImplicant, selectedPis);
 
 	return 0;
 }
