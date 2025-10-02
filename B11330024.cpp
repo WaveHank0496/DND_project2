@@ -229,7 +229,7 @@ map<int, vector<Term>> combineGroups(map<int, vector<Term>>& groups){
 				int pos = canCombine(subGroup.pattern, nextSubGroup.pattern);
 				if(pos != -1){
 					string newPattern = combine(subGroup.pattern, nextSubGroup.pattern);
-					if(newPattern != "" && patternToTerm.find(newPattern) == patternToTerm.end()){
+					if(newPattern != "" && (patternToTerm.find(newPattern) == patternToTerm.end())){
 						Term newTerm;
 						newTerm.pattern = newPattern;
 						newTerm.minterm = subGroup.minterm;
@@ -248,7 +248,64 @@ map<int, vector<Term>> combineGroups(map<int, vector<Term>>& groups){
 	return newGroups;
 }
 
-//test
+//from the groups get all the terms that can't combine anymore
+vector<Term> getAllTerms(const map<int, vector<Term>>& groups, set<int>& minternVar){
+	vector<Term> allTerms;
+	for(auto it : groups){
+		for(auto subIt : it.second){
+			allTerms.push_back(subIt);
+			for(auto m : subIt.minterm){
+				minternVar.insert(m);
+			}
+		}
+	}
+	return allTerms;
+}
+
+//make a sheet that store all the minterm and the prime implicant that can cover it
+map<int, vector<bool>> makePrimeImplicantChart(const vector<Term>& primeImplicants, const set<int>& minternVar){
+	map<int, vector<bool>> chart; 
+	int setSize = minternVar.size();
+	int piIndex = 0;
+	for(auto it : primeImplicants){
+		vector<bool> row(setSize);
+		for(auto minterm : it.minterm){
+			row[minterm] = true;
+		}
+		chart[piIndex] = row;
+		piIndex++;
+	}
+	return chart;
+}
+
+//find the epi
+set<int> findEPI(map<int, vector<bool>> chart, const set<int>& mintermVar ){
+	set<int> EPI;
+	int setSize = mintermVar.size();
+	for(int i = 0; i < setSize; i++){
+		int count = 0;
+		for(int j = 0; j < chart.size(); j++){
+			if(chart[j][i] == true){count++;}
+			if(count > 1) break;
+			else{EPI.insert(i);}
+		}
+	}
+	return EPI;
+}
+
+//find the minterm that didn't in epi
+set<int> findEPIOther(set<int>& EPI, set<int>& mintermVar){
+	set<int> stillUncovered;
+	for(auto it : mintermVar){
+		if(find(EPI.begin(),EPI.end(),it) == EPI.end()){
+			stillUncovered.insert(it);
+		}
+	}
+	return stillUncovered;
+}
+
+
+//test (the test is by ai)
 void testWithRealData() {
     cout << "\n=== Testing with Real PLA Data ===" << endl;
     
@@ -421,7 +478,7 @@ void testDuplicateRemoval() {
     }
 }
 
-//do the method
+
 int main(int argc, char* argv[]){
 	if(argc == 1) {
         cout << "Running tests..." << endl;
@@ -431,7 +488,7 @@ int main(int argc, char* argv[]){
         return 0;
     }
 
-    // 檢查命令列參數
+    // check the input command
     if(argc != 3){
         cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
         return 1;
@@ -440,19 +497,21 @@ int main(int argc, char* argv[]){
     string inputFileName = argv[1];
     string outputFileName = argv[2];
 
-    // 讀取 PLA 檔案
+    // read PLA file
     PlaData data = readPlaFile(inputFileName);
     if(data.varNames.empty()){
         cout << "Failed to read input file!" << endl;
         return 1;
     }
     
-    // 建立 truth table
+    // build truth table
     map<string, int> truthTable = buildTruthTable(data.inputNum, data);
     changeTruthTable(truthTable, data);
     
-    // 初始分組
+    // do the groups by the one count
     map<int, vector<Term>> groups = groupByOne(truthTable);
+	map<int, vector<Term>> newGroups = combineGroups(groups);
+
 
 	return 0;
 }
