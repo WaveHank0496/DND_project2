@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <set>
 #include <cmath>
 #include <algorithm>
 
@@ -19,7 +20,9 @@ struct PlaData {
 
 struct Term {
 	string pattern;
-	int minterm;
+	set<int> minterm;
+	bool combined = false;
+	int mintermNum = 0;
 };
 
 PlaData readPlaFile(string fileName) {
@@ -171,7 +174,11 @@ map<int, vector<Term>> groupByOne(const map<string, int> &truthTable){
 	for(auto term : truthTable){
 		if(term.second == 1){
 			int ones = countOnes(term.first);
-			groups[ones].push_back({term.first, index});
+			Term newTerm;
+			newTerm.pattern = term.first;
+			newTerm.minterm.insert(index);
+			newTerm.combined = false;
+			groups[ones].push_back(newTerm);
 		}
 		index++;
 	}
@@ -208,16 +215,24 @@ string combine(const string&term1, const string& term2){
 	return newTerm;
 }
 
-map<string, vector<int>> combineGroups(map<int, vector<Term>>& groups){
-	map<string, vector<int>> newGroups;
+set<Term> combineGroups(map<int, vector<Term>>& groups){
+    //map<int, vector<Term>> newGroups;
+	set<Term> newGroups;
 	for(int i = 0 ; i < groups.size() - 1; i++){
 		for(auto subGroup : groups[i]){
 			for(auto nextSubGroup : groups[i + 1]){
 				if(canCombine(subGroup.pattern, nextSubGroup.pattern) != -1){
 					string newPattern = combine(subGroup.pattern, nextSubGroup.pattern);
 					if(newPattern != ""){
-						newGroups[newPattern].push_back(subGroup.minterm);
-						newGroups[newPattern].push_back(nextSubGroup.minterm);
+						Term newTerm;
+						newTerm.pattern = newPattern;
+						for(auto it : subGroup.minterm){
+							newTerm.minterm.insert(it);
+						}
+						for(auto it : nextSubGroup.minterm){
+							newTerm.minterm.insert(it);
+						}
+						newGroups.insert(newTerm);
 					}
 				}
 			}
@@ -237,3 +252,29 @@ int main(int argc, char* argv[]){
     cout << combine(t1, t2) << endl;  // 應該輸出：01-1
 }
 
+int main(int argc, char* argv[]){
+    // 檢查命令列參數
+    if(argc != 3){
+        cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
+        return 1;
+    }
+    
+    string inputFileName = argv[1];
+    string outputFileName = argv[2];
+
+    // 讀取 PLA 檔案
+    PlaData data = readPlaFile(inputFileName);
+    if(data.varNames.empty()){
+        cout << "Failed to read input file!" << endl;
+        return 1;
+    }
+    
+    // 建立 truth table
+    map<string, int> truthTable = buildTruthTable(data.inputNum, data);
+    changeTruthTable(truthTable, data);
+    
+    // 初始分組
+    map<int, vector<Term>> groups = groupByOne(truthTable);
+
+	return 0;
+}
