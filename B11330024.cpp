@@ -262,10 +262,6 @@ vector<Term> getAllTerms(const map<int, vector<Term>>& groups, set<int>& mintern
 	return allTerms;
 }
 
-void testWithRealData();
-void testCombineGroups();
-void testDuplicateRemoval();
-
 void printOutPI(vector<Term> primeImplicants){
 	 cout << "\n=== Prime Implicants ===" << endl;
     for(int i = 0; i < primeImplicants.size(); i++){
@@ -385,15 +381,15 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		
 	}
 
-	// ========== Step 6: Petrick's Method  ==========
-	cout << "\n=== Petrick's Method (Enumeration) ===" << endl;
+	// Step 6: Petrick's Method  
+	cout << "\nPetrick's Method" << endl;
 
 	if (uncoveredMinterms.empty())
 	{
 		// all be covered by EPI
 		vector<int> selectedPIs = essentialPIs;
 
-		cout << "\n=== Final Solution ===" << endl;
+		cout << "\nFinal Solution" << endl;
 		cout << "Selected PIs: {";
 		for (int pi : selectedPIs)
 			cout << "PI" << pi << " ";
@@ -401,7 +397,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	}
 	else
 	{
-		// Petrick's Metho
+		// Petrick's Method
 		// find the candidate PIs that can cover the uncovered minterms
 		cout << "Uncovered minterms and their covering PIs:" << endl;
 		for (int m : uncoveredMinterms)
@@ -607,23 +603,12 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 }
 
 int main(int argc, char* argv[]){
-	
-	if(argc == 1) {
-        cout << "Running tests..." << endl;
-        testCombineGroups();
-        testDuplicateRemoval();
-        testWithRealData();
-
-        return 0;
-    }
-	
     // check the input command
 	if(argc != 3){
         cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
         return 1;
     }
 	
-
     string inputFileName = argv[1];
     string outputFileName = argv[2];
 
@@ -665,206 +650,4 @@ int main(int argc, char* argv[]){
 	writePLA(outputFileName, data, makePrimeImplicant, selectedPis);
 
 	return 0;
-}
-
-// test (the test is by ai)
-void testWithRealData()
-{
-	cout << "\n=== Testing with Real PLA Data ===" << endl;
-
-	// 讀取真實的 PLA 檔案
-	PlaData data = readPlaFile("input.pla");
-	if (data.varNames.empty())
-	{
-		cout << "Cannot read input.pla, skipping this test" << endl;
-		return;
-	}
-
-	map<string, int> truthTable = buildTruthTable(data.inputNum, data);
-	changeTruthTable(truthTable, data);
-
-	// 初始分組
-	map<int, vector<Term>> groups = groupByOne(truthTable);
-
-	cout << "Round 0 (initial): " << endl;
-	int totalTerms = 0;
-	for (auto &g : groups)
-	{
-		cout << "  Group " << g.first << ": " << g.second.size() << " terms" << endl;
-		totalTerms += g.second.size();
-	}
-	cout << "  Total: " << totalTerms << " terms" << endl;
-
-	// 第一輪合併
-	auto round1 = combineGroups(groups);
-	cout << "\nRound 1: " << endl;
-	totalTerms = 0;
-	for (auto &g : round1)
-	{
-		cout << "  Group " << g.first << ": " << g.second.size() << " terms" << endl;
-		totalTerms += g.second.size();
-	}
-	cout << "  Total: " << totalTerms << " terms" << endl;
-
-	// 第二輪合併
-	auto round2 = combineGroups(round1);
-	cout << "\nRound 2: " << endl;
-	if (round2.empty())
-	{
-		cout << "  (no more combinations)" << endl;
-	}
-	else
-	{
-		totalTerms = 0;
-		for (auto &g : round2)
-		{
-			cout << "  Group " << g.first << ": " << g.second.size() << " terms" << endl;
-			totalTerms += g.second.size();
-		}
-		cout << "  Total: " << totalTerms << " terms" << endl;
-	}
-}
-void testCombineGroups()
-{
-	cout << "\n=== Testing combineGroups ===" << endl;
-
-	// 建立測試資料
-	map<int, vector<Term>> testGroups;
-
-	// Group 0: 只有一個 term "0000" (m0)
-	Term t0;
-	t0.pattern = "0000";
-	t0.minterm.insert(0);
-	testGroups[0].push_back(t0);
-
-	// Group 1: 兩個 terms
-	Term t1;
-	t1.pattern = "0010";
-	t1.minterm.insert(2);
-	testGroups[1].push_back(t1);
-
-	Term t2;
-	t2.pattern = "1000";
-	t2.minterm.insert(8);
-	testGroups[1].push_back(t2);
-
-	// 印出輸入
-	cout << "Input groups:" << endl;
-	for (auto &g : testGroups)
-	{
-		cout << "Group " << g.first << ":" << endl;
-		for (auto &term : g.second)
-		{
-			cout << "  " << term.pattern << " -> {";
-			for (int m : term.minterm)
-				cout << m << " ";
-			cout << "}" << endl;
-		}
-	}
-
-	// 執行合併
-	map<int, vector<Term>> result = combineGroups(testGroups);
-
-	// 印出結果
-	cout << "\nOutput groups:" << endl;
-	if (result.empty())
-	{
-		cout << "  (empty - no combinations possible)" << endl;
-	}
-	else
-	{
-		for (auto &g : result)
-		{
-			cout << "Group " << g.first << ":" << endl;
-			for (auto &term : g.second)
-			{
-				cout << "  " << term.pattern << " -> {";
-				for (int m : term.minterm)
-					cout << m << " ";
-				cout << "}" << endl;
-			}
-		}
-	}
-
-	// 預期結果
-	cout << "\nExpected:" << endl;
-	cout << "Group 0: 00-0 -> {0 2}" << endl;
-	cout << "Group 0: -000 -> {0 8}" << endl;
-}
-void testDuplicateRemoval()
-{
-	cout << "\n=== Testing Duplicate Removal ===" << endl;
-
-	map<int, vector<Term>> testGroups;
-
-	// 建立會產生重複的情況
-	// Group 0 (0個1): 00-0, -000
-	// Group 1 (1個1): 10-0, -010
-	// 00-0 + 10-0 -> -0-0
-	// -000 + -010 -> -0-0 (重複！)
-
-	Term t1;
-	t1.pattern = "00-0"; // 1個1
-	t1.minterm.insert(0);
-	t1.minterm.insert(2);
-	testGroups[1].push_back(t1);
-
-	Term t2;
-	t2.pattern = "-000"; // 0個1
-	t2.minterm.insert(0);
-	t2.minterm.insert(8);
-	testGroups[0].push_back(t2); // ← 改成 Group 0
-
-	Term t3;
-	t3.pattern = "10-0"; // 1個1
-	t3.minterm.insert(8);
-	t3.minterm.insert(10);
-	testGroups[1].push_back(t3); // ← 改成 Group 1
-
-	Term t4;
-	t4.pattern = "-010"; // 1個1
-	t4.minterm.insert(2);
-	t4.minterm.insert(10);
-	testGroups[1].push_back(t4); // ← 改成 Group 1
-
-	cout << "Input:" << endl;
-	for (auto &g : testGroups)
-	{
-		cout << "Group " << g.first << ":" << endl;
-		for (auto &term : g.second)
-		{
-			cout << "  " << term.pattern << " (" << countOnes(term.pattern) << " ones) -> {";
-			for (int m : term.minterm)
-				cout << m << " ";
-			cout << "}" << endl;
-		}
-	}
-
-	auto result = combineGroups(testGroups);
-
-	cout << "\nOutput (should have only ONE -0-0):" << endl;
-	int count = 0;
-	for (auto &g : result)
-	{
-		cout << "Group " << g.first << ":" << endl;
-		for (auto &term : g.second)
-		{
-			cout << "  " << term.pattern << " -> {";
-			for (int m : term.minterm)
-				cout << m << " ";
-			cout << "}" << endl;
-			if (term.pattern == "-0-0")
-				count++;
-		}
-	}
-
-	cout << "\nResult: ";
-	if (count == 1)
-	{
-		cout << "PASS - Only one -0-0 found" << endl; // ← 移除特殊符號
-	}
-	else
-	{
-		cout << "FAIL - Found " << count << " instances of -0-0 (expected 1)" << endl;
-	}
 }
