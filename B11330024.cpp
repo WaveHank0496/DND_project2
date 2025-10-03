@@ -287,8 +287,6 @@ void printOutPI(vector<Term> primeImplicants){
 }
 vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Term> primeImplicants){
 	// Step 1: collect minterms
-	cout << "\n=== Prime Implicant Chart ===" << endl;
-
 	vector<int> onSetMinterms;
 	for(int i = 0; i < truthTable.size(); i++){
 		string binary = intoBinary(i, data.inputNum);
@@ -297,10 +295,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 			onSetMinterms.push_back(i);
 		}
 	}
-
-	cout << "On-set minterms (output=1): {";
-	for(int m : onSetMinterms) cout << m << " ";
-	cout << "}\n" << endl;
 
 	// Step 2: build the PI chart 
 	// mintermToPIs[m] = where m is covered by which PIs
@@ -316,32 +310,8 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	}
 
 	// Step 3: print the table 
-	cout << "Prime Implicant Chart:" << endl;
-	cout << "       ";
-	for(int m : onSetMinterms){
-		if(m < 10) cout << " m" << m << " ";
-		else cout << " m" << m;
-	}
-	cout << endl;
-
-	for(int i = 0; i < primeImplicants.size(); i++){
-		cout << "PI" << i << "   ";
-		for(int m : onSetMinterms){
-			bool covered = false;
-			// check whether pi i cover m
-			for(int pi : mintermToPIs[m]){
-				if(pi == i){
-					covered = true;
-					break;
-				}
-			}
-			cout << (covered ? "  X " : "    ");
-		}
-		cout << "  " << primeImplicants[i].pattern << endl;
-	}
 
 	// Step 4: find EPI 
-	cout << "\n Finding Essential Prime Implicants " << endl;
 
 	vector<int> essentialPIs;	//EPI number
 	set<int> coveredByEPIs;  //minterms covered by EPI
@@ -354,9 +324,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 			// check if already added
 			if(find(essentialPIs.begin(), essentialPIs.end(), epi) == essentialPIs.end()){
 				essentialPIs.push_back(epi);
-				cout << "m" << m << " only covered by PI" << epi 
-					<< " (" << primeImplicants[epi].pattern << ") -> Essential!" << endl;
-				
 				// check this EPI cover which minterm
 				for(int covered : primeImplicants[epi].minterm){
 					if(truthTable[intoBinary(covered, data.inputNum)] == 1){
@@ -367,14 +334,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		}
 	}
 
-	cout << "\nEssential PIs: {";
-	for(int epi : essentialPIs) cout << "PI" << epi << " ";
-	cout << "}" << endl;
-
-	cout << "Covered by EPIs: {";
-	for(int m : coveredByEPIs) cout << m << " ";
-	cout << "}" << endl;
-
 	//find the uncovered 
 	// Step 5: find uncovered minterms 
 	vector<int> uncoveredMinterms;
@@ -384,22 +343,10 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		}
 	}
 
-	cout << "\nStill need to cover: {";
-	for(int m : uncoveredMinterms) cout << m << " ";
-	cout << "}" << endl;
-
 	if (uncoveredMinterms.empty())
 	{
-		cout << "\nAll minterms covered by Essential PIs!" << endl;
-		cout << "No need for Petrick's Method." << endl;
-
+		// all be covered by EPI
 		vector<int> selectedPIs = essentialPIs;
-
-		cout << "\nFinal Solution" << endl;
-		cout << "Selected PIs: {";
-		for (int pi : selectedPIs)
-			cout << "PI" << pi << " ";
-		cout << "}" << endl;
 
 		// 計算 literals
 		int totalTerms = selectedPIs.size();
@@ -413,28 +360,13 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 			}
 		}
 
-		cout << "Total number of terms: " << totalTerms << endl;
-		cout << "Total number of literals: " << totalLiterals << endl;
-
 		return selectedPIs; 
 	}
 
 	// Step 6: Petrick's Method  
-	cout << "\nPetrick's Method" << endl;
 	{
 		// Petrick's Method
 		// find the candidate PIs that can cover the uncovered minterms
-		cout << "Uncovered minterms and their covering PIs:" << endl;
-		for (int m : uncoveredMinterms)
-		{
-			cout << "  m" << m << " can be covered by: {";
-			for (int pi : mintermToPIs[m])
-			{
-				cout << "PI" << pi << " ";
-			}
-			cout << "}" << endl;
-		}
-
 		vector<int> candidatePIs;
 		for (int i = 0; i < primeImplicants.size(); i++)
 		{
@@ -462,14 +394,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 			}
 		}
 
-		cout << "\nCandidate PIs (non-Essential): {";
-		for (int pi : candidatePIs)
-			cout << "PI" << pi << " ";
-		cout << "}" << endl;
-
 		// 2. Enumerate all combinations (using bitmask)
-		cout << "\nEnumerating all possible combinations..." << endl;
-
 		vector<vector<int>> validSolutions;
 		int minSize = candidatePIs.size() + 1; 
 
@@ -523,9 +448,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 				}
 			}
 		}
-
-		cout << "Found " << validSolutions.size() << " solution(s) with "
-			 << minSize << " PI(s)" << endl;
 		
 		if(validSolutions.empty()){
 			cout << "No valid solution found to cover all minterms!" << endl;
@@ -544,18 +466,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		for (int i = 0; i < validSolutions.size(); i++)
 		{
 			int literals = 0;
-			cout << "\nSolution " << i + 1 << ": {";
-			for (int pi : validSolutions[i])
-			{
-				cout << "PI" << pi << " ";
-				// cout the literals count
-				for (char c : primeImplicants[pi].pattern)
-				{
-					if (c != '-')
-						literals++;
-				}
-			}
-			cout << "} - " << literals << " literals" << endl;
 
 			if (literals < minLiterals)
 			{
@@ -563,8 +473,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 				bestSolution = i;
 			}
 		}
-
-		cout << "\nBest solution is #" << (bestSolution + 1) << endl;
 
 		// 4. combine the best solution with EPIs
 		vector<int> selectedPIs = essentialPIs;
@@ -574,14 +482,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		}
 
 		sort(selectedPIs.begin(), selectedPIs.end());
-
-		cout << "\n=== Final Solution ===" << endl;
-		cout << "Selected PIs: {";
-		for (int pi : selectedPIs)
-		{
-			cout << "PI" << pi << "(" << primeImplicants[pi].pattern << ") ";
-		}
-		cout << "}" << endl;
 
 		// cout total
 		int totalTerms = selectedPIs.size();
@@ -594,10 +494,6 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 					totalLiterals++;
 			}
 		}
-
-		cout << "Total number of terms: " << totalTerms << endl;
-		cout << "Total number of literals: " << totalLiterals << endl;
-
 		return selectedPIs;
 	}
 	return {};
@@ -767,11 +663,6 @@ int main(int argc, char *argv[])
 
 				if (!isSubsetOfHigherTerm && seenPIPatterns.find(term.pattern) == seenPIPatterns.end())
 				{
-					cout << "  " << term.pattern << " is a PI (covers: ";
-					for (int m : term.minterm)
-						cout << m << " ";
-					cout << ")" << endl;
-
 					allPrimeImplicants.push_back(term);
 					seenPIPatterns.insert(term.pattern);
 				}
