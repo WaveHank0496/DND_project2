@@ -235,6 +235,21 @@ map<int, vector<Term>> combineGroups(map<int, vector<Term>>& groups){
 						newTerm.minterm = subGroup.minterm;
 						newTerm.minterm.insert(nextSubGroup.minterm.begin(), nextSubGroup.minterm.end());
 						patternToTerm[newPattern] = newTerm;
+
+						for (auto &term : groups[i])
+						{
+							if (term.pattern == subGroup.pattern)
+							{
+								term.combined = true; // 標記！
+							}
+						}
+						for (auto &term : groups[i + 1])
+						{
+							if (term.pattern == nextSubGroup.pattern)
+							{
+								term.combined = true; // 標記！
+							}
+						}			
 					}
 				}
 			}
@@ -373,20 +388,11 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	for(int m : uncoveredMinterms) cout << m << " ";
 	cout << "}" << endl;
 
-	if(uncoveredMinterms.empty()){
+	if (uncoveredMinterms.empty())
+	{
 		cout << "\nAll minterms covered by Essential PIs!" << endl;
 		cout << "No need for Petrick's Method." << endl;
 
-		vector<int> selectedPIs = essentialPIs;
-		
-	}
-
-	// Step 6: Petrick's Method  
-	cout << "\nPetrick's Method" << endl;
-
-	if (uncoveredMinterms.empty())
-	{
-		// all be covered by EPI
 		vector<int> selectedPIs = essentialPIs;
 
 		cout << "\nFinal Solution" << endl;
@@ -394,8 +400,27 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		for (int pi : selectedPIs)
 			cout << "PI" << pi << " ";
 		cout << "}" << endl;
+
+		// 計算 literals
+		int totalTerms = selectedPIs.size();
+		int totalLiterals = 0;
+		for (int pi : selectedPIs)
+		{
+			for (char c : primeImplicants[pi].pattern)
+			{
+				if (c != '-')
+					totalLiterals++;
+			}
+		}
+
+		cout << "Total number of terms: " << totalTerms << endl;
+		cout << "Total number of literals: " << totalLiterals << endl;
+
+		return selectedPIs; 
 	}
-	else
+
+	// Step 6: Petrick's Method  
+	cout << "\nPetrick's Method" << endl;
 	{
 		// Petrick's Method
 		// find the candidate PIs that can cover the uncovered minterms
@@ -501,6 +526,16 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 
 		cout << "Found " << validSolutions.size() << " solution(s) with "
 			 << minSize << " PI(s)" << endl;
+		
+		if(validSolutions.empty()){
+			cout << "No valid solution found to cover all minterms!" << endl;
+			vector<int> selectedPIs = essentialPIs;
+			for (int pi : candidatePIs)
+			{
+				selectedPIs.push_back(pi);
+			}
+			return selectedPIs;
+		}
 
 		// 3. choose the best solution (minimize literals)
 		int bestSolution = 0;
@@ -602,52 +637,158 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 	cout << "Output file created successfully!" << endl;
 }
 
-int main(int argc, char* argv[]){
-    // check the input command
-	if(argc != 3){
-        cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
-        return 1;
-    }
-	
-    string inputFileName = argv[1];
-    string outputFileName = argv[2];
-
-    // read PLA file
-    PlaData data = readPlaFile(inputFileName);
-    if(data.varNames.empty()){
-        cout << "Failed to read input file!" << endl;
-        return 1;
-    }
-    
-    // build truth table
-    map<string, int> truthTable = buildTruthTable(data.inputNum, data);
-    changeTruthTable(truthTable, data);
-    
-    // do the groups by the one count
-    map<int, vector<Term>> groups = groupByOne(truthTable);
-	int round = 1;
-	while(true){
-    	map<int, vector<Term>> newGroups = combineGroups(groups);
-    	if(newGroups.empty()) break;
-    	groups = newGroups;
-		round++;
-		if(round > 10) break;	//make sure i will stop
+int main(int argc, char *argv[])
+{
+	// check the input command
+	if (argc != 3)
+	{
+		cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
+		return 1;
 	}
 
-	//collect the prime implicants
-	vector<Term> makePrimeImplicant;
-	for(auto& g : groups){
-		for(auto& term : g.second){
-			makePrimeImplicant.push_back(term);
+	string inputFileName = argv[1];
+	string outputFileName = argv[2];
+
+	// read PLA file
+	PlaData data = readPlaFile(inputFileName);
+	if (data.varNames.empty())
+	{
+		cout << "Failed to read input file!" << endl;
+		return 1;
+	}
+
+	// build truth table
+	map<string, int> truthTable = buildTruthTable(data.inputNum, data);
+	changeTruthTable(truthTable, data);
+
+	// ========== Quine-McCluskey Algorithm ==========
+	cout << "\n=== Starting Quine-McCluskey Algorithm ===" << endl;
+
+	// 初始分組
+	map<int, vector<Term>> groups = groupByOne(truthTable);
+
+	cout << "\n=== Round 0 (Original Minterms) ===" << endl;
+	for (auto &g : groups)
+	{
+		cout << "Group " << g.first << ": ";
+		for (auto &t : g.second)
+		{
+			cout << t.pattern << " ";
+		}
+		cout << endl;
+	}
+
+	// 保存所有輪次
+	vector<map<int, vector<Term>>> allRounds;
+	allRounds.push_back(groups);
+
+	// 進行合併
+	int round = 1;
+	while (true)
+	{
+		cout << "\n--- Round " << round << " ---" << endl;
+		map<int, vector<Term>> newGroups = combineGroups(groups);
+
+		if (newGroups.empty())
+		{
+			cout << "No more combinations possible." << endl;
+			break;
+		}
+
+		cout << "New terms: ";
+		for (auto &g : newGroups)
+		{
+			for (auto &t : g.second)
+			{
+				cout << t.pattern << " ";
+			}
+		}
+		cout << endl;
+
+		allRounds.push_back(newGroups);
+		groups = newGroups;
+		round++;
+
+		if (round > 10)
+		{
+			cout << "Warning: Stopped at round 10" << endl;
+			break;
 		}
 	}
-	printOutPI(makePrimeImplicant);
 
-	buildPIChart(truthTable, data, makePrimeImplicant);
+	cout << "\nTotal rounds: " << allRounds.size() << endl;
 
-	vector<int> selectedPis = buildPIChart(truthTable, data, makePrimeImplicant);
+	// ========== 收集 Prime Implicants ==========
+	cout << "\n=== Collecting Prime Implicants ===" << endl;
 
-	writePLA(outputFileName, data, makePrimeImplicant, selectedPis);
+	vector<Term> allPrimeImplicants;
+	set<string> seenPIPatterns;
+
+	for (int r = 0; r < allRounds.size(); r++)
+	{
+		cout << "\nChecking Round " << r << ":" << endl;
+		for (auto &g : allRounds[r])
+		{
+			for (auto &term : g.second)
+			{
+				// 檢查這個 term 的 minterms 是否被包含在更高層的某個 term 中
+				bool isSubsetOfHigherTerm = false;
+
+				for (int rr = r + 1; rr < allRounds.size(); rr++)
+				{
+					for (auto &gg : allRounds[rr])
+					{
+						for (auto &higherTerm : gg.second)
+						{
+							// 檢查 term.minterm 是否是 higherTerm.minterm 的子集
+							bool allIncluded = true;
+							for (int m : term.minterm)
+							{
+								if (higherTerm.minterm.find(m) == higherTerm.minterm.end())
+								{
+									allIncluded = false;
+									break;
+								}
+							}
+
+							// 如果所有 minterms 都被包含，且不完全相同（表示被合併了）
+							if (allIncluded && term.minterm.size() < higherTerm.minterm.size())
+							{
+								isSubsetOfHigherTerm = true;
+								break;
+							}
+						}
+						if (isSubsetOfHigherTerm)
+							break;
+					}
+					if (isSubsetOfHigherTerm)
+						break;
+				}
+
+				if (!isSubsetOfHigherTerm && seenPIPatterns.find(term.pattern) == seenPIPatterns.end())
+				{
+					cout << "  " << term.pattern << " is a PI (covers: ";
+					for (int m : term.minterm)
+						cout << m << " ";
+					cout << ")" << endl;
+
+					allPrimeImplicants.push_back(term);
+					seenPIPatterns.insert(term.pattern);
+				}
+				else if (isSubsetOfHigherTerm)
+				{
+					cout << "  " << term.pattern << " was combined (not a PI)" << endl;
+				}
+			}
+		}
+	}
+	printOutPI(allPrimeImplicants);
+
+	// ========== PI Chart & Petrick's Method ==========
+	vector<int> selectedPIs = buildPIChart(truthTable, data, allPrimeImplicants);
+
+	// ========== Write Output ==========
+	writePLA(outputFileName, data, allPrimeImplicants, selectedPIs);
 
 	return 0;
 }
