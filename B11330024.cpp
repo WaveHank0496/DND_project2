@@ -107,6 +107,21 @@ string intoBinary(int num, int inputNum) {	//inputNum can represent how many bit
 	return result;
 }
 
+int binaryToInt(const string &binary)
+{
+	int result = 0;
+	int power = 1;
+	for (int i = binary.length() - 1; i >= 0; i--)
+	{
+		if (binary[i] == '1')
+		{
+			result += power;
+		}
+		power *= 2;
+	}
+	return result;
+}
+
 map<string, int> buildTruthTable(int inputNum, PlaData& data) {
 	map<string, int> truthTable;
 	int elementAmount = pow(2, inputNum);
@@ -168,23 +183,27 @@ int countOnes(const string& term){
 	return count;	
 }
 
-map<int, vector<Term>> groupByOne(const map<string, int> &truthTable){
+map<int, vector<Term>> groupByOne(const map<string, int> &truthTable)
+{
 	map<int, vector<Term>> groups;
-	int index = 0;
-	for(auto term : truthTable){
-		if(term.second == 1 || term.second == -1){
+
+	for (auto term : truthTable)
+	{
+		if (term.second == 1 || term.second == -1)
+		{
 			int ones = countOnes(term.first);
 			Term newTerm;
 			newTerm.pattern = term.first;
-			newTerm.minterm.insert(index);
+
+			int mintermIndex = binaryToInt(term.first);
+			newTerm.minterm.insert(mintermIndex);
 			newTerm.combined = false;
+
 			groups[ones].push_back(newTerm);
 		}
-		index++;
 	}
 	return groups;
 }
-
 int canCombine(const string& term1, const string& term2){
 	if(term1.length() != term2.length()) return -1;
 	int diff = 0;
@@ -215,48 +234,67 @@ string combine(const string&term1, const string& term2){
 	return newTerm;
 }
 
-map<int, vector<Term>> combineGroups(map<int, vector<Term>>& groups){
+map<int, vector<Term>> combineGroups(map<int, vector<Term>> &groups)
+{
 	map<int, vector<Term>> newGroups;
-	map<string, Term> patternToTerm; //to store the term by its pattern
-	//combine the groups	
-	for(int i = 0 ; i < groups.size() - 1; i++){
-		//check whether the term exist
-		if(groups.find(i) == groups.end() || groups.find(i+1) == groups.end()){
-            continue;
-        }
-		for(auto &subGroup : groups[i]){
-			for(auto &nextSubGroup : groups[i + 1]){
+	map<string, Term> patternToTerm;
+
+	// ⭐ 修正：遍歷所有實際存在的 group pairs
+	vector<int> groupKeys;
+	for (auto &g : groups)
+	{
+		groupKeys.push_back(g.first);
+	}
+
+	// 對每對相鄰的 group 進行合併
+	for (int i = 0; i < groupKeys.size() - 1; i++)
+	{
+		int currentGroup = groupKeys[i];
+		int nextGroup = groupKeys[i + 1];
+
+		// 只合併相鄰的組（差1個1）
+		if (nextGroup - currentGroup != 1)
+			continue;
+
+		for (auto &subGroup : groups[currentGroup])
+		{
+			for (auto &nextSubGroup : groups[nextGroup])
+			{
 				int pos = canCombine(subGroup.pattern, nextSubGroup.pattern);
-				if(pos != -1){
+				if (pos != -1)
+				{
 					string newPattern = combine(subGroup.pattern, nextSubGroup.pattern);
-					if(newPattern != "" && (patternToTerm.find(newPattern) == patternToTerm.end())){
+					if (newPattern != "" && (patternToTerm.find(newPattern) == patternToTerm.end()))
+					{
 						Term newTerm;
 						newTerm.pattern = newPattern;
 						newTerm.minterm = subGroup.minterm;
 						newTerm.minterm.insert(nextSubGroup.minterm.begin(), nextSubGroup.minterm.end());
 						patternToTerm[newPattern] = newTerm;
 
-						for (auto &term : groups[i])
+						// 標記為已合併
+						for (auto &term : groups[currentGroup])
 						{
 							if (term.pattern == subGroup.pattern)
 							{
-								term.combined = true; // 標記！
+								term.combined = true;
 							}
 						}
-						for (auto &term : groups[i + 1])
+						for (auto &term : groups[nextGroup])
 						{
 							if (term.pattern == nextSubGroup.pattern)
 							{
-								term.combined = true; // 標記！
+								term.combined = true;
 							}
-						}			
+						}
 					}
 				}
 			}
 		}
 	}
 
-	for(auto it : patternToTerm){
+	for (auto it : patternToTerm)
+	{
 		int ones = countOnes(it.first);
 		newGroups[ones].push_back(it.second);
 	}
