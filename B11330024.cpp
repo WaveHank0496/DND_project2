@@ -262,57 +262,6 @@ vector<Term> getAllTerms(const map<int, vector<Term>>& groups, set<int>& mintern
 	return allTerms;
 }
 
-/*
-//make a sheet that store all the minterm and the prime implicant that can cover it
-map<int, vector<bool>> makePrimeImplicantChart(const vector<Term>& primeImplicants, const set<int>& minternVar){
-	map<int, vector<bool>> chart; 
-	int setSize = minternVar.size();
-	int piIndex = 0;
-	for(auto it : primeImplicants){
-		vector<bool> row(setSize);
-		for(auto minterm : it.minterm){
-			row[minterm] = true;
-		}
-		chart[piIndex] = row;
-		piIndex++;
-	}
-	return chart;
-}
-
-//find the epi
-set<int> findEPI(map<int, vector<bool>> chart, const set<int>& mintermVar ){
-	set<int> EPI;
-	int setSize = mintermVar.size();
-	for(int i = 0; i < setSize; i++){
-		int count = 0;
-		int row = 0;
-		for(int j = 0; j < chart.size(); j++){
-			if(chart[j][i] == true){
-				count++;
-				row  = j;
-			}
-			if(count > 1) {
-				row = 0;
-				break;
-			}
-			else{EPI.insert(row);}
-		}
-	}
-	return EPI;
-}
-
-//find the minterm that didn't in epi
-set<int> findEPIOther(set<int>& EPI, set<int>& mintermVar){
-	set<int> stillUncovered;
-	for(auto it : mintermVar){
-		if(find(EPI.begin(),EPI.end(),it) == EPI.end()){
-			stillUncovered.insert(it);
-		}
-	}
-	return stillUncovered;
-}
-*/
-
 void testWithRealData();
 void testCombineGroups();
 void testDuplicateRemoval();
@@ -342,7 +291,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	for(int m : onSetMinterms) cout << m << " ";
 	cout << "}\n" << endl;
 
-	// Step 2: build the reverse index 
+	// Step 2: build the PI chart 
 	// mintermToPIs[m] = where m is covered by which PIs
 	map<int, vector<int>> mintermToPIs;
 
@@ -355,7 +304,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		}
 	}
 
-	// ========== Step 3: print the table ==========
+	// Step 3: print the table 
 	cout << "Prime Implicant Chart:" << endl;
 	cout << "       ";
 	for(int m : onSetMinterms){
@@ -380,12 +329,11 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		cout << "  " << primeImplicants[i].pattern << endl;
 	}
 
-	//find EPI
-	// ========== Step 4: find EPI ==========
-	cout << "\n=== Finding Essential Prime Implicants ===" << endl;
+	// Step 4: find EPI 
+	cout << "\n Finding Essential Prime Implicants " << endl;
 
-	vector<int> essentialPIs;
-	set<int> coveredByEPIs;  
+	vector<int> essentialPIs;	//EPI number
+	set<int> coveredByEPIs;  //minterms covered by EPI
 
 	for(int m : onSetMinterms){
 		if(mintermToPIs[m].size() == 1){
@@ -417,7 +365,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	cout << "}" << endl;
 
 	//find the uncovered 
-	// ========== Step 5: find uncovered minterms ==========
+	// Step 5: find uncovered minterms 
 	vector<int> uncoveredMinterms;
 	for(int m : onSetMinterms){
 		if(coveredByEPIs.find(m) == coveredByEPIs.end()){
@@ -668,7 +616,6 @@ int main(int argc, char* argv[]){
 
         return 0;
     }
-
 	
     // check the input command
 	if(argc != 3){
