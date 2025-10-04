@@ -19,10 +19,9 @@ struct PlaData {
 };
 
 struct Term {
-	string pattern;
-	set<int> minterm;
+	string pattern;	//the minterm pattern
+	set<int> minterm;	//collect the pattern that have been simply, and contain which minterms
 	bool combined = false;
-	int mintermNum = 0;
 };
 
 PlaData readPlaFile(string fileName) {
@@ -89,6 +88,7 @@ PlaData readPlaFile(string fileName) {
 	return data;
 }
 
+//make the number into binary format and return the string
 string intoBinary(int num, int inputNum) {	//inputNum can represent how many bits
 	string result = "";
 	if (num < 2) {
@@ -107,6 +107,7 @@ string intoBinary(int num, int inputNum) {	//inputNum can represent how many bit
 	return result;
 }
 
+//make the binary string into int, cause I need to know which minterm is covered
 int binaryToInt(const string &binary)
 {
 	int result = 0;
@@ -122,6 +123,7 @@ int binaryToInt(const string &binary)
 	return result;
 }
 
+//build the truth table with all the input 
 map<string, int> buildTruthTable(int inputNum, PlaData& data) {
 	map<string, int> truthTable;
 	int elementAmount = pow(2, inputNum);
@@ -160,16 +162,39 @@ vector<string> splitProduct(string product) {
 	return result;
 }
 
-void changeTruthTable(map<string, int>& truthTable, PlaData data) {
-	for (auto element : data.productLine) {
-		if (element.first.find('-') != string::npos) {
+//change the truth table according to the product line
+void changeTruthTable(map<string, int> &truthTable, PlaData data)
+{
+	// build the truth table according to the product line
+	for (auto element : data.productLine){
+		if (element.first.find('-') != string::npos){
 			vector<string> extraProduct = splitProduct(element.first);
-			for (auto it : extraProduct) {
-				truthTable[it] = element.second;
+			for (auto it : extraProduct){
+				if (truthTable[it] == 0){ // only change when the value is 0
+					truthTable[it] = element.second;
+				}
 			}
 		}
-		else {
-			truthTable[element.first] = element.second;
+		else{
+			if (truthTable[element.first] == 0){
+				truthTable[element.first] = element.second;
+			}
+		}
+	}
+
+	// cause the don't care can be used to simplify the function
+	for (auto element : data.productLine){
+		if (element.second == 1){
+			if (element.first.find('-') != string::npos){
+				vector<string> extraProduct = splitProduct(element.first);
+				for (auto it : extraProduct)
+				{
+					truthTable[it] = 1;
+				}
+			}
+			else{
+				truthTable[element.first] = 1;
+			}
 		}
 	}
 }
@@ -187,10 +212,8 @@ map<int, vector<Term>> groupByOne(const map<string, int> &truthTable)
 {
 	map<int, vector<Term>> groups;
 
-	for (auto term : truthTable)
-	{
-		if (term.second == 1 || term.second == -1)
-		{
+	for (auto term : truthTable){
+		if (term.second == 1 || term.second == -1) {
 			int ones = countOnes(term.first);
 			Term newTerm;
 			newTerm.pattern = term.first;
@@ -225,6 +248,7 @@ int canCombine(const string& term1, const string& term2){
 	return pos;
 }
 
+//combine two terms into a new term by the hyphem method
 string combine(const string&term1, const string& term2){
 	string newTerm;
 	newTerm = term1;
@@ -234,56 +258,43 @@ string combine(const string&term1, const string& term2){
 	return newTerm;
 }
 
-map<int, vector<Term>> combineGroups(map<int, vector<Term>> &groups)
-{
-	map<int, vector<Term>> newGroups;
-	map<string, Term> patternToTerm;
+map<int, vector<Term>> combineGroups(map<int, vector<Term>> &groups){
+	map<int, vector<Term>> newGroups;	// store the new groups after combine
+	map<string, Term> patternToTerm;	// store the new pattern make sure no double term
 
-	// ⭐ 修正：遍歷所有實際存在的 group pairs
+	// collect all the group keys for map
 	vector<int> groupKeys;
-	for (auto &g : groups)
-	{
-		groupKeys.push_back(g.first);
+	for (auto &gro : groups){
+		groupKeys.push_back(gro.first);
 	}
 
-	// 對每對相鄰的 group 進行合併
-	for (int i = 0; i < groupKeys.size() - 1; i++)
-	{
+	// combine every two term in neighbor groups
+	for (int i = 0; i < groupKeys.size() - 1; i++){
 		int currentGroup = groupKeys[i];
 		int nextGroup = groupKeys[i + 1];
 
-		// 只合併相鄰的組（差1個1）
-		if (nextGroup - currentGroup != 1)
-			continue;
+		if (nextGroup - currentGroup != 1) continue;
 
-		for (auto &subGroup : groups[currentGroup])
-		{
-			for (auto &nextSubGroup : groups[nextGroup])
-			{
-				int pos = canCombine(subGroup.pattern, nextSubGroup.pattern);
-				if (pos != -1)
-				{
+		for (auto &subGroup : groups[currentGroup]){
+			for (auto &nextSubGroup : groups[nextGroup]){
+				int pos = canCombine(subGroup.pattern, nextSubGroup.pattern);	// check if can combine
+				if (pos != -1){	//the -1 means cannot combine
 					string newPattern = combine(subGroup.pattern, nextSubGroup.pattern);
-					if (newPattern != "" && (patternToTerm.find(newPattern) == patternToTerm.end()))
-					{
+					if (newPattern != "" && (patternToTerm.find(newPattern) == patternToTerm.end())){
 						Term newTerm;
 						newTerm.pattern = newPattern;
 						newTerm.minterm = subGroup.minterm;
 						newTerm.minterm.insert(nextSubGroup.minterm.begin(), nextSubGroup.minterm.end());
 						patternToTerm[newPattern] = newTerm;
 
-						// 標記為已合併
-						for (auto &term : groups[currentGroup])
-						{
-							if (term.pattern == subGroup.pattern)
-							{
+						// mark the old terms as combined
+						for (auto &term : groups[currentGroup]){
+							if (term.pattern == subGroup.pattern){
 								term.combined = true;
 							}
 						}
-						for (auto &term : groups[nextGroup])
-						{
-							if (term.pattern == nextSubGroup.pattern)
-							{
+						for (auto &term : groups[nextGroup]){
+							if (term.pattern == nextSubGroup.pattern){
 								term.combined = true;
 							}
 						}
@@ -293,26 +304,11 @@ map<int, vector<Term>> combineGroups(map<int, vector<Term>> &groups)
 		}
 	}
 
-	for (auto it : patternToTerm)
-	{
+	for (auto it : patternToTerm){
 		int ones = countOnes(it.first);
 		newGroups[ones].push_back(it.second);
 	}
 	return newGroups;
-}
-
-//from the groups get all the terms that can't combine anymore
-vector<Term> getAllTerms(const map<int, vector<Term>>& groups, set<int>& minternVar){
-	vector<Term> allTerms;
-	for(auto it : groups){
-		for(auto subIt : it.second){
-			allTerms.push_back(subIt);
-			for(auto m : subIt.minterm){
-				minternVar.insert(m);
-			}
-		}
-	}
-	return allTerms;
 }
 
 void printOutPI(vector<Term> primeImplicants){
@@ -323,6 +319,7 @@ void printOutPI(vector<Term> primeImplicants){
         cout << "}" << endl;
     }
 }
+
 vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Term> primeImplicants){
 	// Step 1: collect minterms
 	vector<int> onSetMinterms;
@@ -347,10 +344,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		}
 	}
 
-	// Step 3: print the table 
-
-	// Step 4: find EPI 
-
+	// Step 3: find EPI 
 	vector<int> essentialPIs;	//EPI number
 	set<int> coveredByEPIs;  //minterms covered by EPI
 
@@ -373,7 +367,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	}
 
 	//find the uncovered 
-	// Step 5: find uncovered minterms 
+	// Step 4: find uncovered minterms 
 	vector<int> uncoveredMinterms;
 	for(int m : onSetMinterms){
 		if(coveredByEPIs.find(m) == coveredByEPIs.end()){
@@ -384,15 +378,13 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 	if (uncoveredMinterms.empty())
 	{
 		// all be covered by EPI
-		vector<int> selectedPIs = essentialPIs;
+		vector<int> selectedPIs = essentialPIs;	// copy EPIs to selected PIs
 
-		// 計算 literals
-		int totalTerms = selectedPIs.size();
-		int totalLiterals = 0;
-		for (int pi : selectedPIs)
-		{
-			for (char c : primeImplicants[pi].pattern)
-			{
+		// count total
+		int totalTerms = selectedPIs.size();	// total number of terms
+		int totalLiterals = 0;	//
+		for (int pi : selectedPIs){
+			for (char c : primeImplicants[pi].pattern){
 				if (c != '-')
 					totalLiterals++;
 			}
@@ -400,34 +392,24 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 
 		return selectedPIs; 
 	}
-
-	// Step 6: Petrick's Method  
-	{
-		// Petrick's Method
+	else{ // Step 5: maybe is the Petrick's Method
 		// find the candidate PIs that can cover the uncovered minterms
 		vector<int> candidatePIs;
-		for (int i = 0; i < primeImplicants.size(); i++)
-		{
+		for (int i = 0; i < primeImplicants.size(); i++){
 			// skip EPIs
-			if (find(essentialPIs.begin(), essentialPIs.end(), i) != essentialPIs.end())
-			{
-				continue;
-			}
+			if (find(essentialPIs.begin(), essentialPIs.end(), i) != essentialPIs.end()) continue;
 
 			// check whether pi i cover any uncovered minterm
 			bool useful = false;
-			for (int m : uncoveredMinterms)
-			{
+			for (int m : uncoveredMinterms){
 				// check whether pi i is in mintermToPIs[m]
-				if (find(mintermToPIs[m].begin(), mintermToPIs[m].end(), i) != mintermToPIs[m].end())
-				{
+				if (find(mintermToPIs[m].begin(), mintermToPIs[m].end(), i) != mintermToPIs[m].end()){
 					useful = true;
 					break;
 				}
 			}
 
-			if (useful)
-			{
+			if (useful){	// if this PI can cover any uncovered minterm, add to candidate list
 				candidatePIs.push_back(i);
 			}
 		}
@@ -437,51 +419,43 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		int minSize = candidatePIs.size() + 1; 
 
 		// use bitmask to enumerate all combinations (from 1 to 2^n - 1)
-		for (int mask = 1; mask < (1 << candidatePIs.size()); mask++)
-		{
+		for (int mask = 1; mask < (1 << candidatePIs.size()); mask++){
 			vector<int> combination;
 
 			// build the combination from the bitmask
-			for (int i = 0; i < candidatePIs.size(); i++)
-			{
-				if (mask & (1 << i))
-				{
+			for (int i = 0; i < candidatePIs.size(); i++){
+				if (mask & (1 << i)){	
+					// here use the method of the bit counting
+					// this means if the i-th bit is 1, include candidatePIs[i]
 					combination.push_back(candidatePIs[i]);
 				}
 			}
 
 			// check that this combination covers all uncovered minterms
 			bool coversAll = true;
-			for (int m : uncoveredMinterms)
-			{
+			for (int m : uncoveredMinterms){
 				bool covered = false;
-				for (int pi : combination)
-				{
+				for (int pi : combination){
 					// check whether pi is in mintermToPIs[m]
-					if (primeImplicants[pi].minterm.find(m) != primeImplicants[pi].minterm.end())
-					{
+					if (primeImplicants[pi].minterm.find(m) != primeImplicants[pi].minterm.end()){
 						covered = true;
 						break;
 					}
 				}
-				if (!covered)
-				{
+				if (!covered){	// if any minterm is not covered
 					coversAll = false;
 					break;
 				}
 			}
 
-			if (coversAll)
-			{
-				if (combination.size() < minSize)
-				{
+			if (coversAll){	// if this combination covers all uncovered minterms
+				if (combination.size() < minSize){
 					// if found smaller solution, clear previous ones
 					validSolutions.clear();
 					validSolutions.push_back(combination);
 					minSize = combination.size();
 				}
-				else if (combination.size() == minSize)
-				{
+				else if (combination.size() == minSize){
 					validSolutions.push_back(combination);
 				}
 			}
@@ -490,8 +464,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		if(validSolutions.empty()){
 			cout << "No valid solution found to cover all minterms!" << endl;
 			vector<int> selectedPIs = essentialPIs;
-			for (int pi : candidatePIs)
-			{
+			for (int pi : candidatePIs){
 				selectedPIs.push_back(pi);
 			}
 			return selectedPIs;
@@ -499,14 +472,20 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 
 		// 3. choose the best solution (minimize literals)
 		int bestSolution = 0;
-		int minLiterals = 999999;
+		int minLiterals = 999999;	// a large number
 
-		for (int i = 0; i < validSolutions.size(); i++)
-		{
+		for (int i = 0; i < validSolutions.size(); i++){
 			int literals = 0;
 
-			if (literals < minLiterals)
-			{
+			// count literals in this solution
+			for (int pi : validSolutions[i]){
+				for (char c : primeImplicants[pi].pattern){
+					if (c != '-')
+						literals++;
+				}
+			}
+
+			if (literals < minLiterals){
 				minLiterals = literals;
 				bestSolution = i;
 			}
@@ -514,8 +493,7 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 
 		// 4. combine the best solution with EPIs
 		vector<int> selectedPIs = essentialPIs;
-		for (int pi : validSolutions[bestSolution])
-		{
+		for (int pi : validSolutions[bestSolution]){
 			selectedPIs.push_back(pi);
 		}
 
@@ -524,17 +502,14 @@ vector<int> buildPIChart(map<string, int>& truthTable, PlaData& data, vector<Ter
 		// cout total
 		int totalTerms = selectedPIs.size();
 		int totalLiterals = 0;
-		for (int pi : selectedPIs)
-		{
-			for (char c : primeImplicants[pi].pattern)
-			{
+		for (int pi : selectedPIs){
+			for (char c : primeImplicants[pi].pattern){
 				if (c != '-')
 					totalLiterals++;
 			}
 		}
 		return selectedPIs;
 	}
-	return {};
 }
 
 void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicants, vector<int> selectedPIs){
@@ -542,8 +517,7 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 	cout << "\nWriting output to " << outputFileName << "..." << endl;
 
 	ofstream outFile(outputFileName);
-	if (!outFile.is_open())
-	{
+	if (!outFile.is_open()){
 		cout << "Error: Cannot create output file!" << endl;
 	}
 
@@ -551,8 +525,7 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 	outFile << ".i " << data.inputNum << endl;
 	outFile << ".o 1" << endl;
 	outFile << ".ilb";
-	for (const string &var : data.varNames)
-	{
+	for (const string &var : data.varNames){
 		outFile << " " << var;
 	}
 	outFile << endl;
@@ -560,8 +533,7 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 	outFile << ".p " << selectedPIs.size() << endl;
 
 	// write the selected prime implicants
-	for (int pi : selectedPIs)
-	{
+	for (int pi : selectedPIs){
 		outFile << primeImplicants[pi].pattern << " 1" << endl;
 	}
 
@@ -574,8 +546,7 @@ void writePLA(string &outputFileName, PlaData& data, vector<Term> primeImplicant
 int main(int argc, char *argv[])
 {
 	// check the input command
-	if (argc != 3)
-	{
+	if (argc != 3){
 		cout << "Usage: " << argv[0] << " <input.pla> <output.pla>" << endl;
 		return 1;
 	}
@@ -585,8 +556,7 @@ int main(int argc, char *argv[])
 
 	// read PLA file
 	PlaData data = readPlaFile(inputFileName);
-	if (data.varNames.empty())
-	{
+	if (data.varNames.empty()){
 		cout << "Failed to read input file!" << endl;
 		return 1;
 	}
@@ -595,15 +565,14 @@ int main(int argc, char *argv[])
 	map<string, int> truthTable = buildTruthTable(data.inputNum, data);
 	changeTruthTable(truthTable, data);
 
-	// ========== Quine-McCluskey Algorithm ==========
-	cout << "\n=== Starting Quine-McCluskey Algorithm ===" << endl;
+	// Quine-McCluskey Algorithm 
+	cout << "\n Starting Quine-McCluskey Algorithm " << endl;
 
-	// 初始分組
+	// original groups
 	map<int, vector<Term>> groups = groupByOne(truthTable);
 
 	cout << "\n=== Round 0 (Original Minterms) ===" << endl;
-	for (auto &g : groups)
-	{
+	for (auto &g : groups){
 		cout << "Group " << g.first << ": ";
 		for (auto &t : g.second)
 		{
